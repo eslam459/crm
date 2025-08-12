@@ -37,11 +37,13 @@
         </Button>
       </ListHeaderItem>
     </ListHeader>
+
     <ListRows
       :rows="rows"
       v-slot="{ idx, column, item, row }"
       doctype="CRM Lead"
     >
+      <!-- عرض المكلّفين -->
       <div v-if="column.key === '_assign'" class="flex items-center">
         <MultipleAvatar
           :avatars="item"
@@ -58,6 +60,8 @@
           "
         />
       </div>
+
+      <!-- باقي الأعمدة (ومنها mobile_no) -->
       <ListRowItem v-else :item="item" :align="column.align">
         <template #prefix>
           <div v-if="column.key === 'status'">
@@ -81,20 +85,59 @@
               size="sm"
             />
           </div>
-          <div v-else-if="column.key === 'mobile_no'">
-            <PhoneIcon class="h-4 w-4" />
-          </div>
         </template>
+
         <template #default="{ label }">
+          <!-- خلية الموبايل: رقم كامل + اتصال + واتساب -->
           <div
-            v-if="
-              [
-                'modified',
-                'creation',
-                'first_response_time',
-                'first_responded_on',
-                'response_by',
-              ].includes(column.key)
+            v-if="column.key === 'mobile_no'"
+            class="flex items-center justify-between gap-2"
+          >
+            <div class="flex items-center gap-2 min-w-0">
+              <span>
+                {{ typeof item === 'object' && item ? item.label : item }}
+              </span>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <!-- اتصال -->
+              <Button
+                v-if="getMobile(row)"
+                variant="ghost"
+                class="!p-1"
+                @click.stop="makeCall(getMobile(row))"
+                :title="__('Call')"
+                aria-label="Call"
+              >
+                <PhoneIcon class="h-4 w-4" />
+              </Button>
+              <!-- واتساب -->
+              <Button
+                v-if="getMobile(row)"
+                variant="ghost"
+                class="!p-1"
+                @click.stop="openWhatsApp(getMobile(row))"
+                :title="__('Open WhatsApp')"
+                aria-label="Open WhatsApp"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  class="h-4 w-4"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"
+                  />
+                </svg>
+              </Button>
+            </div>
+          </div>
+
+          <!-- تواريخ -->
+          <div
+            v-else-if="
+              ['modified','creation','first_response_time','first_responded_on','response_by'].includes(column.key)
             "
             class="truncate text-base"
             @click="
@@ -112,26 +155,22 @@
               <div>{{ item.timeAgo }}</div>
             </Tooltip>
           </div>
+
+          <!-- لايك -->
           <div v-else-if="column.key === '_liked_by'">
             <Button
-              v-if="column.key == '_liked_by'"
               variant="ghosted"
               :class="isLiked(item) ? 'fill-red-500' : 'fill-white'"
               @click.stop.prevent="
-                () =>
-                  emit('likeDoc', {
-                    name: row.name,
-                    liked: isLiked(item),
-                  })
+                () => emit('likeDoc', { name: row.name, liked: isLiked(item) })
               "
             >
               <HeartIcon class="h-4 w-4" />
             </Button>
           </div>
-          <div
-            v-else-if="column.key === 'sla_status'"
-            class="truncate text-base"
-          >
+
+          <!-- SLA -->
+          <div v-else-if="column.key === 'sla_status'" class="truncate text-base">
             <Badge
               v-if="item.value"
               :variant="'subtle'"
@@ -150,6 +189,8 @@
               "
             />
           </div>
+
+          <!-- Check -->
           <div v-else-if="column.type === 'Check'">
             <FormControl
               type="checkbox"
@@ -158,6 +199,8 @@
               class="text-ink-gray-9"
             />
           </div>
+
+          <!-- باقي الأعمدة -->
           <div
             v-else
             class="truncate text-base"
@@ -177,16 +220,8 @@
         </template>
       </ListRowItem>
     </ListRows>
-    <ListSelectBanner>
-      <template #actions="{ selections, unselectAll }">
-        <Dropdown
-          :options="listBulkActionsRef.bulkActions(selections, unselectAll)"
-        >
-          <Button icon="more-horizontal" variant="ghost" />
-        </Dropdown>
-      </template>
-    </ListSelectBanner>
   </ListView>
+
   <ListFooter
     v-if="pageLengthCount"
     class="border-t sm:px-5 px-3 py-2"
@@ -217,20 +252,17 @@ import {
   ListFooter,
   Dropdown,
   Tooltip,
+  Button,
+  FormControl,
+  Badge,
 } from 'frappe-ui'
 import { sessionStore } from '@/stores/session'
 import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 const props = defineProps({
-  rows: {
-    type: Array,
-    required: true,
-  },
-  columns: {
-    type: Array,
-    required: true,
-  },
+  rows: { type: Array, required: true },
+  columns: { type: Array, required: true },
   options: {
     type: Object,
     default: () => ({
@@ -253,7 +285,6 @@ const emit = defineEmits([
 ])
 
 const route = useRoute()
-
 const pageLengthCount = defineModel()
 const list = defineModel('list')
 
@@ -262,11 +293,13 @@ const isLikeFilterApplied = computed(() => {
 })
 
 const { user } = sessionStore()
-
 function isLiked(item) {
-  if (item) {
-    let likedByMe = JSON.parse(item)
+  if (!item) return false
+  try {
+    const likedByMe = JSON.parse(item)
     return likedByMe.includes(user)
+  } catch {
+    return false
   }
 }
 
@@ -276,10 +309,23 @@ watch(pageLengthCount, (val, old_value) => {
 })
 
 const listBulkActionsRef = ref(null)
-
 defineExpose({
   customListActions: computed(
     () => listBulkActionsRef.value?.customListActions,
   ),
 })
+
+/** Utils */
+function getMobile(row) {
+  const v = row?.mobile_no
+  return typeof v === 'object' && v !== null ? v.label : v || ''
+}
+function makeCall(number) {
+  const n = String(number || '').trim()
+  if (n) window.open(`tel:${n}`)
+}
+function openWhatsApp(number) {
+  const phone = String(number || '').replace(/\D/g, '')
+  if (phone) window.open(`https://wa.me/${phone}`, '_blank')
+}
 </script>
